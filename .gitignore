@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .coverage
+htmlcov/
 
 # Virtual environments
 venv/
@@ -30,3 +31,8 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Postman local workspace
+.postman/
+# Local database backup
+database/
