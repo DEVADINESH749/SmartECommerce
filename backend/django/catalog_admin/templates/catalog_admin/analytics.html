@@ -1,0 +1,135 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Analytics | {{ site_title }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .analytics { --ink: #172a31; --muted: #60747a; --line: #d9e2df; --paper: #fff; --wash: #f3f7f5; --teal: #087e78; --lime: #c1dc66; --amber: #c98322; color: var(--ink); max-width: 1440px; }
+  .analytics * { box-sizing: border-box; }
+  .analytics h1, .analytics h2, .analytics p { margin-top: 0; }
+  .analytics h1 { font-size: 25px; margin-bottom: 4px; }
+  .analytics h2 { font-size: 16px; margin-bottom: 14px; }
+  .analytics .subtle { color: var(--muted); font-size: 13px; }
+  .analytics .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 16px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .analytics .toolbar label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+  .analytics .toolbar select, .analytics .toolbar input { min-height: 36px; padding: 6px 9px; border: 1px solid #aabbb8; border-radius: 3px; background: var(--paper); color: var(--ink); }
+  .analytics .toolbar button { min-height: 36px; border: 0; border-radius: 3px; background: var(--teal); color: white; padding: 0 16px; font-weight: 700; cursor: pointer; }
+  .analytics .toolbar button:hover { background: #06635f; }
+  .analytics .date-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+  .analytics .error { color: #a13a28; font-weight: 600; margin: 0 0 14px; }
+  .analytics .metrics { display: grid; grid-template-columns: repeat(6, minmax(125px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .analytics .metric { border: 1px solid var(--line); border-top: 3px solid var(--teal); background: var(--paper); padding: 14px; min-height: 100px; }
+  .analytics .metric:nth-child(2), .analytics .metric:nth-child(5) { border-top-color: var(--amber); }
+  .analytics .metric:nth-child(3), .analytics .metric:nth-child(6) { border-top-color: #8da83c; }
+  .analytics .metric-label { color: var(--muted); font-size: 12px; }
+  .analytics .metric-value { display: block; margin-top: 8px; font-size: 23px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .analytics .panels { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(270px, .75fr); gap: 14px; margin-bottom: 14px; }
+  .analytics .panel { min-width: 0; border: 1px solid var(--line); background: var(--paper); padding: 16px; }
+  .analytics .table-wrap { overflow-x: auto; }
+  .analytics table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .analytics th, .analytics td { padding: 9px 8px; border-bottom: 1px solid #e6ecea; text-align: left; white-space: nowrap; }
+  .analytics th { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .analytics td.numeric, .analytics th.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+  .analytics .chart-scroll { overflow-x: auto; padding: 8px 0 2px; }
+  .analytics .bars { display: grid; align-items: end; gap: 5px; min-height: 150px; grid-auto-columns: minmax(22px, 1fr); grid-auto-flow: column; border-bottom: 1px solid var(--line); }
+  .analytics .bar-column { display: flex; min-width: 22px; height: 140px; flex-direction: column; justify-content: end; align-items: center; gap: 5px; }
+  .analytics .bar { display: block; width: min(100%, 27px); min-height: 2px; height: var(--bar-height); background: var(--teal); border-radius: 2px 2px 0 0; }
+  .analytics .bar-label { overflow: hidden; max-width: 42px; color: var(--muted); font-size: 10px; text-align: center; }
+  .analytics .legend { display: flex; gap: 7px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 9px; }
+  .analytics .legend-mark { width: 9px; height: 9px; background: var(--teal); }
+  .analytics .status-count { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 12px; background: var(--wash); text-align: center; font-weight: 700; }
+  @media (max-width: 1100px) { .analytics .metrics { grid-template-columns: repeat(3, minmax(130px, 1fr)); } }
+  @media (max-width: 760px) { .analytics .panels { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .analytics .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; } .analytics .metric { padding: 11px; } .analytics .metric-value { font-size: 20px; } .analytics .toolbar { align-items: stretch; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analytics">
+  <header>
+    <h1>Commerce analytics</h1>
+    <p class="subtle">{{ start_date|date:"M j, Y" }} to {{ end_date|date:"M j, Y" }} · Revenue includes confirmed and fulfilled orders only.</p>
+  </header>
+
+  <form class="toolbar" method="get">
+    <label for="period">Date range
+      <select id="period" name="period" onchange="if (this.value !== 'custom') this.form.requestSubmit()">
+        {% for value, label in date_filters %}<option value="{{ value }}"{% if period == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="date-fields">
+      <label for="start-date">From<input id="start-date" type="date" name="start_date" value="{{ start_date_input }}"></label>
+      <label for="end-date">To<input id="end-date" type="date" name="end_date" value="{{ end_date_input }}"></label>
+    </div>
+    <button type="submit">Apply range</button>
+  </form>
+  {% if date_error %}<p class="error" role="alert">{{ date_error }}</p>{% endif %}
+
+  <section class="metrics" aria-label="Analytics summary">
+    <article class="metric"><span class="metric-label">Total orders</span><strong class="metric-value">{{ summary.total_orders }}</strong></article>
+    <article class="metric"><span class="metric-label">Successful orders</span><strong class="metric-value">{{ summary.confirmed_orders }}</strong></article>
+    <article class="metric"><span class="metric-label">Order revenue</span><strong class="metric-value">₹{{ summary.total_revenue|floatformat:2 }}</strong></article>
+    <article class="metric"><span class="metric-label">Products</span><strong class="metric-value">{{ summary.total_products }}</strong></article>
+    <article class="metric"><span class="metric-label">Low stock</span><strong class="metric-value">{{ summary.low_stock_products }}</strong></article>
+    <article class="metric"><span class="metric-label">Customers</span><strong class="metric-value">{{ summary.total_customers }}</strong></article>
+  </section>
+
+  <div class="panels">
+    <section class="panel">
+      <h2>Daily orders and revenue</h2>
+      <div class="chart-scroll" role="img" aria-label="Daily order revenue bars">
+        <div class="bars" style="grid-template-columns: repeat({{ daily_sales|length }}, minmax(26px, 1fr));">
+          {% for item in daily_sales %}<div class="bar-column" title="{{ item.label }}: {{ item.order_count }} orders, ₹{{ item.revenue|floatformat:2 }}"><span class="bar" style="--bar-height: {{ item.bar_height }}%;"></span><span class="bar-label">{{ item.label }}</span></div>{% endfor %}
+        </div>
+      </div>
+      <p class="legend"><span class="legend-mark"></span>Revenue from paid orders</p>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th class="numeric">Orders</th><th class="numeric">Revenue</th></tr></thead><tbody>
+        {% for item in daily_sales %}<tr><td>{{ item.date|date:"M j, Y" }}</td><td class="numeric">{{ item.order_count }}</td><td class="numeric">₹{{ item.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No sales in this range.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Monthly revenue</h2>
+      <div class="chart-scroll" role="img" aria-label="Monthly order revenue bars">
+        <div class="bars" style="grid-template-columns: repeat({{ monthly_sales|length }}, minmax(38px, 1fr));">
+          {% for item in monthly_sales %}<div class="bar-column" title="{{ item.label }}: ₹{{ item.revenue|floatformat:2 }}"><span class="bar" style="--bar-height: {{ item.bar_height }}%;"></span><span class="bar-label">{{ item.label }}</span></div>{% endfor %}
+        </div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Month</th><th class="numeric">Orders</th><th class="numeric">Revenue</th></tr></thead><tbody>
+        {% for item in monthly_sales %}<tr><td>{{ item.label }}</td><td class="numeric">{{ item.order_count }}</td><td class="numeric">₹{{ item.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No sales in this range.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h2>Top-selling products</h2>
+      <div class="table-wrap"><table><thead><tr><th>Product</th><th class="numeric">Quantity sold</th><th class="numeric">Revenue</th></tr></thead><tbody>
+        {% for item in top_products %}<tr><td>{{ item.product_name }}</td><td class="numeric">{{ item.quantity_sold }}</td><td class="numeric">₹{{ item.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No paid product sales in this range.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Low stock <span class="subtle">(active products, 5 or fewer)</span></h2>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Product</th><th class="numeric">Stock</th><th class="numeric">Price</th></tr></thead><tbody>
+        {% for item in low_stock %}<tr><td>{{ item.id }}</td><td>{{ item.name }}</td><td class="numeric">{{ item.stock }}</td><td class="numeric">₹{{ item.price|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4">No active products at or below the threshold.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h2>Order status</h2>
+      <div class="table-wrap"><table><thead><tr><th>Status</th><th class="numeric">Orders</th></tr></thead><tbody>
+        {% for item in order_status %}<tr><td>{{ item.status|title }}</td><td class="numeric"><span class="status-count">{{ item.count }}</span></td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Payment status</h2>
+      <div class="table-wrap"><table><thead><tr><th>Status</th><th class="numeric">Payments</th></tr></thead><tbody>
+        {% for item in payment_status %}<tr><td>{{ item.status|title }}</td><td class="numeric"><span class="status-count">{{ item.count }}</span></td></tr>{% endfor %}
+      </tbody></table></div>
+      <p class="subtle" style="margin: 12px 0 0;">Successful payment revenue: <strong>₹{{ summary.successful_payment_revenue|floatformat:2 }}</strong></p>
+    </section>
+  </div>
+</div>
+{% endblock %}

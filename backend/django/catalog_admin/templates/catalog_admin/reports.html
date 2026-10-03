@@ -1,0 +1,132 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Reports | {{ site_title }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .reports { --ink: #172a31; --muted: #60747a; --line: #d9e2df; --paper: #fff; --wash: #f3f7f5; --teal: #087e78; --amber: #c98322; color: var(--ink); max-width: 1440px; }
+  .reports * { box-sizing: border-box; }
+  .reports h1, .reports h2, .reports p { margin-top: 0; }
+  .reports h1 { margin-bottom: 4px; font-size: 25px; }
+  .reports h2 { margin-bottom: 14px; font-size: 16px; }
+  .reports .subtle { color: var(--muted); font-size: 13px; }
+  .reports .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 16px 0; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .reports label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+  .reports select, .reports input { min-height: 36px; padding: 6px 9px; border: 1px solid #aabbb8; border-radius: 3px; background: var(--paper); color: var(--ink); }
+  .reports button, .reports .button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; padding: 0 13px; border: 0; border-radius: 3px; background: var(--teal); color: white; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .reports .button.secondary { background: #33595a; }
+  .reports .button:hover, .reports button:hover { filter: brightness(.9); }
+  .reports .date-fields, .reports .filters-actions, .reports .exports { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+  .reports .exports { padding: 0 0 18px; }
+  .reports .error { color: #a13a28; font-weight: 600; }
+  .reports .metrics { display: grid; grid-template-columns: repeat(4, minmax(135px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .reports .metric { min-height: 88px; padding: 13px; border: 1px solid var(--line); border-top: 3px solid var(--teal); background: var(--paper); }
+  .reports .metric:nth-child(2) { border-top-color: var(--amber); }
+  .reports .metric-label { color: var(--muted); font-size: 12px; }
+  .reports .metric-value { display: block; margin-top: 8px; font-size: 22px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .reports .panel { min-width: 0; margin-bottom: 14px; padding: 16px; border: 1px solid var(--line); background: var(--paper); }
+  .reports .panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .reports .table-wrap { overflow-x: auto; }
+  .reports table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .reports th, .reports td { padding: 9px 8px; border-bottom: 1px solid #e6ecea; text-align: left; white-space: nowrap; }
+  .reports th { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .reports td.numeric, .reports th.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+  .reports tfoot td { font-weight: 750; border-top: 2px solid var(--line); }
+  .reports .pagination { display: flex; justify-content: space-between; gap: 12px; padding-top: 10px; color: var(--muted); font-size: 12px; }
+  .reports .pagination a { color: var(--teal); font-weight: 700; text-decoration: none; }
+  .reports .summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .reports .status-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e6ecea; font-size: 13px; }
+  @media (max-width: 760px) { .reports .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reports .summaries { grid-template-columns: 1fr; } }
+  @media (max-width: 420px) { .reports .metric-value { font-size: 19px; } .reports .filters { align-items: stretch; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reports">
+  <header>
+    <h1>Reports</h1>
+    <p class="subtle">Read-only sales, order, inventory, and payment reports for {{ start_date|date:"M j, Y" }} to {{ end_date|date:"M j, Y" }}.</p>
+  </header>
+
+  <form class="filters" method="get">
+    <label for="period">Date range
+      <select id="period" name="period" onchange="if (this.value !== 'custom') this.form.requestSubmit()">
+        {% for value, label in date_filters %}<option value="{{ value }}"{% if period == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="date-fields">
+      <label for="start-date">From<input id="start-date" type="date" name="start_date" value="{{ start_date_input }}"></label>
+      <label for="end-date">To<input id="end-date" type="date" name="end_date" value="{{ end_date_input }}"></label>
+    </div>
+    <button type="submit">Apply filter</button>
+  </form>
+  {% if date_error %}<p class="error" role="alert">{{ date_error }}</p>{% endif %}
+
+  <nav class="exports" aria-label="Download reports">
+    <a class="button" href="{% url 'admin_reports_export' 'sales.csv' %}?{{ export_query }}">Download Sales CSV</a>
+    <a class="button" href="{% url 'admin_reports_export' 'orders.csv' %}?{{ export_query }}">Download Orders CSV</a>
+    <a class="button" href="{% url 'admin_reports_export' 'inventory.csv' %}?{{ export_query }}">Download Inventory CSV</a>
+    <a class="button" href="{% url 'admin_reports_export' 'payments.csv' %}?{{ export_query }}">Download Payments CSV</a>
+    <a class="button secondary" href="{% url 'admin_reports_export' 'sales.pdf' %}?{{ export_query }}">Download Sales PDF</a>
+    <a class="button secondary" href="{% url 'admin_reports_export' 'orders.pdf' %}?{{ export_query }}">Download Orders PDF</a>
+  </nav>
+
+  <section class="metrics" aria-label="Sales summary">
+    <article class="metric"><span class="metric-label">Successful orders</span><strong class="metric-value">{{ sales_summary.successful_orders }}</strong></article>
+    <article class="metric"><span class="metric-label">Revenue</span><strong class="metric-value">₹{{ sales_summary.revenue|floatformat:2 }}</strong></article>
+    <article class="metric"><span class="metric-label">Quantity sold</span><strong class="metric-value">{{ sales_summary.quantity_sold }}</strong></article>
+    <article class="metric"><span class="metric-label">Average order value</span><strong class="metric-value">₹{{ sales_summary.average_order_value|floatformat:2 }}</strong></article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><h2>Sales report</h2><span class="subtle">Paid and fulfilled orders only</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th class="numeric">Orders</th><th class="numeric">Quantity sold</th><th class="numeric">Revenue</th></tr></thead>
+      <tbody>{% for row in sales %}<tr><td>{{ row.date|date:"M j, Y" }}</td><td class="numeric">{{ row.orders }}</td><td class="numeric">{{ row.quantity_sold }}</td><td class="numeric">₹{{ row.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4">No sales in this period.</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td>Total</td><td class="numeric">{{ sales_summary.successful_orders }}</td><td class="numeric">{{ sales_summary.quantity_sold }}</td><td class="numeric">₹{{ sales_summary.revenue|floatformat:2 }}</td></tr></tfoot>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><h2>Orders report</h2><span class="subtle">{{ orders_page.paginator.count }} orders</span></div>
+    <div class="summaries">
+      <div>{% for item in order_status %}<div class="status-row"><span>{{ item.status|title }}</span><strong>{{ item.count }}</strong></div>{% endfor %}</div>
+      <div class="table-wrap"><table><thead><tr><th>Order ID</th><th>User</th><th class="numeric">Total amount</th><th>Status</th><th>Created</th><th>Updated</th></tr></thead>
+        <tbody>{% for order in orders_page %}<tr><td>{{ order.id }}</td><td>{{ order.user.name }}</td><td class="numeric">₹{{ order.total_amount|floatformat:2 }}</td><td>{{ order.status }}</td><td>{{ order.created_at|date:"Y-m-d H:i" }}</td><td>{{ order.updated_at|date:"Y-m-d H:i" }}</td></tr>{% empty %}<tr><td colspan="6">No orders in this period.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+    {% if orders_page.has_other_pages %}<div class="pagination"><span>Page {{ orders_page.number }} of {{ orders_page.paginator.num_pages }}</span><span>{% if orders_page.has_previous %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&orders_page={{ orders_page.previous_page_number }}">Previous</a>{% endif %} {% if orders_page.has_next %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&orders_page={{ orders_page.next_page_number }}">Next</a>{% endif %}</span></div>{% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><h2>Product and inventory report</h2><span class="subtle">{{ product_summary.total }} products</span></div>
+    <div class="metrics"><article class="metric"><span class="metric-label">Active products</span><strong class="metric-value">{{ product_summary.active }}</strong></article><article class="metric"><span class="metric-label">Inactive products</span><strong class="metric-value">{{ product_summary.inactive }}</strong></article><article class="metric"><span class="metric-label">Low stock (active, 5 or fewer)</span><strong class="metric-value">{{ product_summary.low_stock }}</strong></article></div>
+    <div class="table-wrap"><table><thead><tr><th>Product ID</th><th>Product</th><th>Category</th><th class="numeric">Price</th><th class="numeric">Current stock</th><th class="numeric">Popularity</th><th>Active</th></tr></thead>
+      <tbody>{% for product in products_page %}<tr><td>{{ product.id }}</td><td>{{ product.name }}</td><td>{{ product.category }}</td><td class="numeric">₹{{ product.price|floatformat:2 }}</td><td class="numeric">{{ product.stock }}</td><td class="numeric">{{ product.popularity }}</td><td>{{ product.is_active|yesno:"Yes,No" }}</td></tr>{% empty %}<tr><td colspan="7">No products found.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if products_page.has_other_pages %}<div class="pagination"><span>Page {{ products_page.number }} of {{ products_page.paginator.num_pages }}</span><span>{% if products_page.has_previous %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&products_page={{ products_page.previous_page_number }}">Previous</a>{% endif %} {% if products_page.has_next %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&products_page={{ products_page.next_page_number }}">Next</a>{% endif %}</span></div>{% endif %}
+    <h3>Low-stock products <span class="subtle">(active only)</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>Product ID</th><th>Product</th><th class="numeric">Current stock</th><th class="numeric">Price</th></tr></thead>
+      <tbody>{% for product in low_stock %}<tr><td>{{ product.id }}</td><td>{{ product.name }}</td><td class="numeric">{{ product.stock }}</td><td class="numeric">₹{{ product.price|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4">No active products at or below the stock threshold.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><h2>Top products</h2><span class="subtle">Successful orders only</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Product</th><th class="numeric">Quantity sold</th><th class="numeric">Revenue</th></tr></thead>
+      <tbody>{% for row in top_products %}<tr><td>{{ row.product_name }}</td><td class="numeric">{{ row.quantity_sold }}</td><td class="numeric">₹{{ row.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No product sales in this period.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><h2>Payments report</h2><span class="subtle">{{ payment_summary.successful_count }} successful payments · ₹{{ payment_summary.successful_revenue|floatformat:2 }}</span></div>
+    <div class="summaries">
+      <div>{% for item in payment_status %}<div class="status-row"><span>{{ item.status|title }}</span><strong>{{ item.count }}</strong></div>{% endfor %}</div>
+      <div class="table-wrap"><table><thead><tr><th>Payment ID</th><th>Order ID</th><th>User</th><th class="numeric">Amount</th><th>Currency</th><th>Status</th><th>Created</th></tr></thead>
+        <tbody>{% for payment in payments_page %}<tr><td>{{ payment.id }}</td><td>{{ payment.order_id }}</td><td>{{ payment.user.name }}</td><td class="numeric">{{ payment.amount|floatformat:2 }}</td><td>{{ payment.currency|upper }}</td><td>{{ payment.status }}</td><td>{{ payment.created_at|date:"Y-m-d H:i" }}</td></tr>{% empty %}<tr><td colspan="7">No payments in this period.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+    {% if payments_page.has_other_pages %}<div class="pagination"><span>Page {{ payments_page.number }} of {{ payments_page.paginator.num_pages }}</span><span>{% if payments_page.has_previous %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&payments_page={{ payments_page.previous_page_number }}">Previous</a>{% endif %} {% if payments_page.has_next %}<a href="?period={{ period }}&start_date={{ start_date_input }}&end_date={{ end_date_input }}&payments_page={{ payments_page.next_page_number }}">Next</a>{% endif %}</span></div>{% endif %}
+  </section>
+</div>
+{% endblock %}
